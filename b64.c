@@ -4,13 +4,11 @@
 #include <stdio.h>
 #include <string.h>
 
-#define PERMS                  0666
-#define RAW_BUFSIZE            48
-#define ENCODED_BUFSIZE        64
+#define BUFSIZE_RAW            48
+#define BUFSIZE_ENCODED        64
 
 int encode(char *raw, char *buf, int size);
 int decode(char *encode, char *buf, int count);
-void init_unmap_table(void);
 
 char map[64] = { 'A',  'B',  'C',  'D',  'E',  'F',  'G',  'H',  'I',
                 'J',  'K',  'L',  'M',  'N',  'O',  'P',  'Q',  'R',  'S',  'T',
@@ -18,27 +16,18 @@ char map[64] = { 'A',  'B',  'C',  'D',  'E',  'F',  'G',  'H',  'I',
                 'e',  'f',  'g',  'h',  'i',  'j',  'k',  'l',  'm',  'n',
                 'o',  'p',  'q',  'r',  's',  't',  'u',  'v',  'w',  'x',  'y',  'z',
                 '0',  '1',  '2',  '3',  '4',  '5',  '6',  '7',  '8',  '9', '+', '/' };
-char unmap[128];
-
-void init_unmap_table(void) {
-        int i;
-
-        for (i = 'A'; i <= 'Z'; i++)
-                unmap[i] = i - 'A';
-        for (i = 'a'; i <= 'z'; i++)
-                unmap[i] = i - 'a' + 26;
-        for (i = '0'; i <= '9'; i++) 
-                unmap[i] = i - '0' + 52;
-        unmap['+'] = 62;
-        unmap['/'] = 63;
-        unmap['='] = 0;
-}
+char unmap[128] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 62, 0, 0, 0, 63,
+        52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4, 
+        5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 
+        25, 0, 0, 0, 0, 0, 0, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38,
+        39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 0, 0, 0, 0, 0};
 
 int main(int argc, char *argv[]) {
         FILE *f;
 	int count;
-	char buf_raw[RAW_BUFSIZE];
-        char buf_encoded[ENCODED_BUFSIZE];
+	char buf_raw[BUFSIZE_RAW];
+        char buf_encoded[BUFSIZE_ENCODED];
 
 	if (argc != 3) {
 		fprintf(stderr, "usage: b64 <mode> <file>\n");
@@ -55,7 +44,7 @@ int main(int argc, char *argv[]) {
                 }
 
                 /* returns the number of bytes read */
-                while ((count = fread(buf_raw, sizeof(char), RAW_BUFSIZE, f)) > 0) {
+                while ((count = fread(buf_raw, sizeof(char), BUFSIZE_RAW, f)) > 0) {
                         /* return number of bytes encoded */
                         count = encode(buf_raw, buf_encoded, count);
                         if (fwrite(buf_encoded, sizeof(char), count, stdout) != count) {
@@ -74,9 +63,8 @@ int main(int argc, char *argv[]) {
                         return -1;
                 }
 
-                init_unmap_table();
                 /* return the number of bytes read */
-                while ((count = fread(buf_encoded, sizeof(char), ENCODED_BUFSIZE, stdin)) > 0) {
+                while ((count = fread(buf_encoded, sizeof(char), BUFSIZE_ENCODED, stdin)) > 0) {
                         /* return number of bytes decoded */
                         count = decode(buf_encoded, buf_raw, count);
                         if (fwrite(buf_raw, sizeof(char), count, f) != count) {
@@ -101,13 +89,13 @@ int decode(char *encode, char *buf, int count) {
 
         for (; count > 0; count -= 4) {
                 /* get current byte and first two bits of next byte */
-                c = ((unmap[(int)encode[i]] << 2) | ((unmap[(int)encode[i+1]] & 0x30) >> 4));
+                c = ((unmap[(unsigned char)encode[i]] << 2) | ((unmap[(unsigned char)encode[i+1]] & 0x30) >> 4));
                 buf[j++] = c;
                 /* get second byte */
-                c = (((unmap[(int)encode[i+1]] & 0xf) << 4) | ((unmap[(int)encode[i+2]] & 0x3c) >> 2));
+                c = (((unmap[(unsigned char)encode[i+1]] & 0xf) << 4) | ((unmap[(unsigned char)encode[i+2]] & 0x3c) >> 2));
                 buf[j++] = c;
                 /* last byte */
-                c = (((unmap[(int)encode[i+2]] & 0x3) << 6) | unmap[(int)encode[i+3]]);
+                c = (((unmap[(unsigned char)encode[i+2]] & 0x3) << 6) | unmap[(unsigned char)encode[i+3]]);
                 buf[j++] = c;
                 i += 4;
         }
