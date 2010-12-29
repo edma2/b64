@@ -30,53 +30,49 @@ int main(int argc, char *argv[]) {
         char buf_encoded[BUFSIZE_ENCODED];
 
 	if (argc != 3) {
-		fprintf(stderr, "usage: b64 <mode> <file>\n");
+		fprintf(stderr, "usage: b64 <mode> <input file>\n");
 		return -1;
 	}
 
-        /* encode - read from file, write to stdout */
-        if (!strcmp(argv[1], "-e")) {
-                /* open source file */
-                f = fopen(argv[2], "r");
-                if (f == NULL) {
-                        fprintf(stderr, "error: cannot open file\n");
-                        return -1;
-                }
+        /* open source file */
+        f = fopen(argv[2], "r");
+        if (f == NULL) {
+                fprintf(stderr, "b64: cannot open file\n");
+                return -1;
+        }
 
+        /* encode */
+        if (!strcmp(argv[1], "-e")) {
                 /* returns the number of bytes read */
                 while ((count = fread(buf_raw, sizeof(char), BUFSIZE_RAW, f)) > 0) {
                         /* return number of bytes encoded */
                         count = encode(buf_raw, buf_encoded, count);
                         if (fwrite(buf_encoded, sizeof(char), count, stdout) != count) {
-                                fprintf(stderr, "error: write error\n");
+                                fprintf(stderr, "b64: write error\n");
                                 break;
                         }
                 }
-
                 if (count < 0)
-                        fprintf(stderr, "error: read error\n");
-        /* decode - read from stdin, write to file */ 
+                        fprintf(stderr, "b64: read error\n");
+        /* decode */
         } else if (!strcmp(argv[1], "-d")) {
-                f = fopen(argv[2], "w+");
-                if (f == NULL) {
-                        fprintf(stderr, "error: cannot create file\n");
-                        return -1;
-                }
-
                 /* return the number of bytes read */
-                while ((count = fread(buf_encoded, sizeof(char), BUFSIZE_ENCODED, stdin)) > 0) {
+                while ((count = fread(buf_encoded, sizeof(char), BUFSIZE_ENCODED, f)) > 0) {
                         /* return number of bytes decoded */
                         count = decode(buf_encoded, buf_raw, count);
-                        if (fwrite(buf_raw, sizeof(char), count, f) != count) {
-                                fprintf(stderr, "error: write error\n");
+                        if (count < 0) {
+                                fprintf(stderr, "b64: not a base64 file\n");
+                                return -1;
+                        }
+                        if (fwrite(buf_raw, sizeof(char), count, stdout) != count) {
+                                fprintf(stderr, "b64: write error\n");
                                 break;
                         }
                 }
-
                 if (count < 0)
-                        fprintf(stderr, "error: read error\n");
+                        fprintf(stderr, "b64: read error\n");
         } else {
-                fprintf(stderr, "error: missing switch flag (-e for encode, -d for decode)\n");
+                fprintf(stderr, "b64: missing switch flag (-e for encode, -d for decode)\n");
         }
         fclose(f);
 
@@ -88,6 +84,9 @@ int decode(char *encode, char *buf, int count) {
         int i = 0, j = 0;
 
         for (; count > 0; count -= 4) {
+                if (encode[i] > sizeof(unmap) || encode[i+1] > sizeof(unmap) \
+                                || encode[i+2] > sizeof(unmap) || encode[i+3] > sizeof(unmap))
+                        return -1;
                 /* get current byte and first two bits of next byte */
                 c = ((unmap[(unsigned char)encode[i]] << 2) | ((unmap[(unsigned char)encode[i+1]] & 0x30) >> 4));
                 buf[j++] = c;
