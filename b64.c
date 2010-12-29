@@ -7,16 +7,16 @@
 #define BUFSIZE_RAW            48
 #define BUFSIZE_ENCODED        64
 
-int encode(char *raw, char *buf, int size);
-int decode(char *encode, char *buf, int count);
+int encode(char *raw, unsigned char *buf, int size);
+int decode(unsigned char *encode, char *buf, int count);
 
-char map[64] = { 'A',  'B',  'C',  'D',  'E',  'F',  'G',  'H',  'I',
+const char map[64] = { 'A',  'B',  'C',  'D',  'E',  'F',  'G',  'H',  'I',
                 'J',  'K',  'L',  'M',  'N',  'O',  'P',  'Q',  'R',  'S',  'T',
                 'U',  'V',  'W',  'X',  'Y',  'Z', 'a',  'b',  'c',  'd',
                 'e',  'f',  'g',  'h',  'i',  'j',  'k',  'l',  'm',  'n',
                 'o',  'p',  'q',  'r',  's',  't',  'u',  'v',  'w',  'x',  'y',  'z',
                 '0',  '1',  '2',  '3',  '4',  '5',  '6',  '7',  '8',  '9', '+', '/' };
-char unmap[128] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+const char unmap[128] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 62, 0, 0, 0, 63,
         52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4, 
         5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 
@@ -27,7 +27,7 @@ int main(int argc, char *argv[]) {
         FILE *f;
 	int count;
 	char buf_raw[BUFSIZE_RAW];
-        char buf_encoded[BUFSIZE_ENCODED];
+        unsigned char buf_encoded[BUFSIZE_ENCODED];
 
 	if (argc != 3) {
 		fprintf(stderr, "usage: b64 <mode> <input file>\n");
@@ -42,7 +42,7 @@ int main(int argc, char *argv[]) {
         }
 
         /* encode */
-        if (!strcmp(argv[1], "-e")) {
+        if (strcmp(argv[1], "-e") == 0) {
                 /* returns the number of bytes read */
                 while ((count = fread(buf_raw, sizeof(char), BUFSIZE_RAW, f)) > 0) {
                         /* return number of bytes encoded */
@@ -55,13 +55,14 @@ int main(int argc, char *argv[]) {
                 if (count < 0)
                         fprintf(stderr, "b64: read error\n");
         /* decode */
-        } else if (!strcmp(argv[1], "-d")) {
+        } else if (strcmp(argv[1], "-d") == 0) {
                 /* return the number of bytes read */
                 while ((count = fread(buf_encoded, sizeof(char), BUFSIZE_ENCODED, f)) > 0) {
                         /* return number of bytes decoded */
                         count = decode(buf_encoded, buf_raw, count);
                         if (count < 0) {
                                 fprintf(stderr, "b64: not a base64 file\n");
+                                fclose(f);
                                 return -1;
                         }
                         if (fwrite(buf_raw, sizeof(char), count, stdout) != count) {
@@ -79,7 +80,7 @@ int main(int argc, char *argv[]) {
 	return 0;
 }
 
-int decode(char *encode, char *buf, int count) {
+int decode(unsigned char *encode, char *buf, int count) {
         char c;
         int i = 0, j = 0;
 
@@ -88,13 +89,13 @@ int decode(char *encode, char *buf, int count) {
                                 || encode[i+2] > sizeof(unmap) || encode[i+3] > sizeof(unmap))
                         return -1;
                 /* get current byte and first two bits of next byte */
-                c = ((unmap[(unsigned char)encode[i]] << 2) | ((unmap[(unsigned char)encode[i+1]] & 0x30) >> 4));
+                c = ((unmap[encode[i]] << 2) | ((unmap[encode[i+1]] & 0x30) >> 4));
                 buf[j++] = c;
                 /* get second byte */
-                c = (((unmap[(unsigned char)encode[i+1]] & 0xf) << 4) | ((unmap[(unsigned char)encode[i+2]] & 0x3c) >> 2));
+                c = (((unmap[encode[i+1]] & 0xf) << 4) | ((unmap[encode[i+2]] & 0x3c) >> 2));
                 buf[j++] = c;
                 /* last byte */
-                c = (((unmap[(unsigned char)encode[i+2]] & 0x3) << 6) | unmap[(unsigned char)encode[i+3]]);
+                c = (((unmap[encode[i+2]] & 0x3) << 6) | unmap[encode[i+3]]);
                 buf[j++] = c;
                 i += 4;
         }
@@ -103,7 +104,7 @@ int decode(char *encode, char *buf, int count) {
 }
 
 /* count is the number of bytes to encode */
-int encode(char *raw, char *buf, int count) {
+int encode(char *raw, unsigned char *buf, int count) {
         int c;
         int i = 0, j = 0;
 
