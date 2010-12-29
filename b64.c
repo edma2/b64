@@ -84,23 +84,22 @@ int main(int argc, char *argv[]) {
 
 int decode(uint8_t *buf_encoded, uint8_t *buf_raw, int len) {
         uint8_t c;
-        int i = 0, j = 0;
+        int i, j;
 
-        for (; len > 0; len -= 4) {
+        /* each iteration reads four bytes at a time until we've read up to len bytes */
+        for (i = 0, j = 0; i < len; i += 4) {
                 if (buf_encoded[i] > sizeof(unmap) || buf_encoded[i+1] > sizeof(unmap) \
                                 || buf_encoded[i+2] > sizeof(unmap) || buf_encoded[i+3] > sizeof(unmap))
                         return -1;
-                /* get current byte and first two bits of next byte */
+                /* first byte */
                 c = ((unmap[buf_encoded[i]] << 2) | ((unmap[buf_encoded[i+1]] & 0x30) >> 4));
                 buf_raw[j++] = c;
-                /* get second byte */
+                /* second byte */
                 c = (((unmap[buf_encoded[i+1]] & 0xf) << 4) | ((unmap[buf_encoded[i+2]] & 0x3c) >> 2));
                 buf_raw[j++] = c;
                 /* last byte */
                 c = (((unmap[buf_encoded[i+2]] & 0x3) << 6) | unmap[buf_encoded[i+3]]);
                 buf_raw[j++] = c;
-                /* we read 4 bytes at a time */
-                i += 4;
         }
 
         return j;
@@ -108,35 +107,29 @@ int decode(uint8_t *buf_encoded, uint8_t *buf_raw, int len) {
 
 int encode(uint8_t *buf_raw, uint8_t *buf_encoded, int len) {
         uint8_t c;
-        int i = 0, j = 0;
+        int i, j;
 
-        for (; len > 0; len -= 3) {
+        /* read up to len bytes */
+        for (i = 0, j = 0; i < len; i += 3) {
                 /* extract first 6 bits */
                 c = ((buf_raw[i] & 0xfc) >> 2); 
                 buf_encoded[j++] = map[c];
-
                 /* extract second set */
                 c = ((buf_raw[i] & 0x3) << 4) | ((buf_raw[i+1] & 0xf0) >> 4); 
                 buf_encoded[j++] = map[c];
-
                 /* extract third set */
-                if (len > 1) {
-                        c = ((buf_raw[i+1] & 0xf) << 2) | ((buf_raw[i+2] & 0xc0) >> 6); 
-                        buf_encoded[j++] = map[c];
-                }
-
+                if (i == len-2 || i == len-1)
+                        break;
+                c = ((buf_raw[i+1] & 0xf) << 2) | ((buf_raw[i+2] & 0xc0) >> 6); 
+                buf_encoded[j++] = map[c];
                 /* extract fourth set */
-                if (len > 2) {
-                        c = (buf_raw[i+2] & 0x3f);
-                        buf_encoded[j++] = map[c];
-                }
-                /* we read 3 bytes at a time */
-                i += 3;
+                if (i == len-2)
+                        break;
+                c = (buf_raw[i+2] & 0x3f);
+                buf_encoded[j++] = map[c];
         }
         /* add padding */
-        if (len < 0) 
-                buf_encoded[j++] = '=';
-        if (len < -1) 
+        for (; i < len; i++)
                 buf_encoded[j++] = '=';
 
         return j;
