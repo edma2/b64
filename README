@@ -1,2 +1,4 @@
-base 64 encoder-decoder 
+b64 - base64 encoder and decoder, reads from files and writes to stdout 
 author: Eugene Ma (edma2)
+
+Run 'make' in your shell.

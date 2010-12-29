@@ -1,4 +1,4 @@
-/* base 64 encoder-decoder 
+/* b64 - base64 encoder and decoder, reads from files and writes to stdout 
  * author: Eugene Ma (edma2) */
 
 #include <stdio.h>
@@ -8,15 +8,17 @@
 #define BUFSIZE_RAW            48
 #define BUFSIZE_ENCODED        64
 
-int encode(uint8_t *buf_raw, uint8_t *buf_encoded, int size);
-int decode(uint8_t *buf_encoded, uint8_t *buf_raw, int count);
+int encode(uint8_t *buf_raw, uint8_t *buf_encoded, int len);
+int decode(uint8_t *buf_encoded, uint8_t *buf_raw, int len);
 
+/* base64 to ascii */
 const uint8_t map[64] = { 'A',  'B',  'C',  'D',  'E',  'F',  'G',  'H',  'I',
                 'J',  'K',  'L',  'M',  'N',  'O',  'P',  'Q',  'R',  'S',  'T',
                 'U',  'V',  'W',  'X',  'Y',  'Z', 'a',  'b',  'c',  'd',
                 'e',  'f',  'g',  'h',  'i',  'j',  'k',  'l',  'm',  'n',
                 'o',  'p',  'q',  'r',  's',  't',  'u',  'v',  'w',  'x',  'y',  'z',
                 '0',  '1',  '2',  '3',  '4',  '5',  '6',  '7',  '8',  '9', '+', '/' };
+/* ascii to base64 */
 const uint8_t unmap[128] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 62, 0, 0, 0, 63,
         52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4, 
@@ -26,7 +28,7 @@ const uint8_t unmap[128] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
 
 int main(int argc, char *argv[]) {
         FILE *f;
-	int count;
+	int len;
 	uint8_t buf_raw[BUFSIZE_RAW];
         uint8_t buf_encoded[BUFSIZE_ENCODED];
 
@@ -41,51 +43,50 @@ int main(int argc, char *argv[]) {
                 fprintf(stderr, "b64: cannot open file\n");
                 return -1;
         }
-
         /* encode */
         if (strcmp(argv[1], "-e") == 0) {
                 /* read up to BUFSIZE_RAW bytes */
-                while ((count = fread(buf_raw, sizeof(uint8_t), BUFSIZE_RAW, f)) > 0) {
+                while ((len = fread(buf_raw, sizeof(uint8_t), BUFSIZE_RAW, f)) > 0) {
                         /* return number of bytes encoded */
-                        count = encode(buf_raw, buf_encoded, count);
-                        if (fwrite(buf_encoded, sizeof(uint8_t), count, stdout) != count) {
+                        len = encode(buf_raw, buf_encoded, len);
+                        if (fwrite(buf_encoded, sizeof(uint8_t), len, stdout) != len) {
                                 fprintf(stderr, "b64: write error\n");
                                 break;
                         }
                 }
-                if (count < 0)
+                if (len < 0)
                         fprintf(stderr, "b64: read error\n");
         /* decode */
         } else if (strcmp(argv[1], "-d") == 0) {
                 /* read up to BUFSIZE_ENCODED bytes */
-                while ((count = fread(buf_encoded, sizeof(uint8_t), BUFSIZE_ENCODED, f)) > 0) {
+                while ((len = fread(buf_encoded, sizeof(uint8_t), BUFSIZE_ENCODED, f)) > 0) {
                         /* return number of bytes decoded */
-                        count = decode(buf_encoded, buf_raw, count);
-                        if (count < 0) {
-                                fprintf(stderr, "b64: not a base64 file\n");
+                        len = decode(buf_encoded, buf_raw, len);
+                        if (len < 0) {
+                                fprintf(stderr, "b64: invalid data\n");
                                 fclose(f);
                                 return -1;
                         }
-                        if (fwrite(buf_raw, sizeof(uint8_t), count, stdout) != count) {
+                        if (fwrite(buf_raw, sizeof(uint8_t), len, stdout) != len) {
                                 fprintf(stderr, "b64: write error\n");
                                 break;
                         }
                 }
-                if (count < 0)
+                if (len < 0)
                         fprintf(stderr, "b64: read error\n");
         } else {
-                fprintf(stderr, "b64: missing switch flag (-e for encode, -d for decode)\n");
+                fprintf(stderr, "b64: missing flag (-e for encode, -d for decode)\n");
         }
         fclose(f);
 
 	return 0;
 }
 
-int decode(uint8_t *buf_encoded, uint8_t *buf_raw, int count) {
+int decode(uint8_t *buf_encoded, uint8_t *buf_raw, int len) {
         uint8_t c;
         int i = 0, j = 0;
 
-        for (; count > 0; count -= 4) {
+        for (; len > 0; len -= 4) {
                 if (buf_encoded[i] > sizeof(unmap) || buf_encoded[i+1] > sizeof(unmap) \
                                 || buf_encoded[i+2] > sizeof(unmap) || buf_encoded[i+3] > sizeof(unmap))
                         return -1;
@@ -98,18 +99,18 @@ int decode(uint8_t *buf_encoded, uint8_t *buf_raw, int count) {
                 /* last byte */
                 c = (((unmap[buf_encoded[i+2]] & 0x3) << 6) | unmap[buf_encoded[i+3]]);
                 buf_raw[j++] = c;
+                /* we read 4 bytes at a time */
                 i += 4;
         }
 
         return j;
 }
 
-/* count is the number of bytes to encode */
-int encode(uint8_t *buf_raw, uint8_t *buf_encoded, int count) {
+int encode(uint8_t *buf_raw, uint8_t *buf_encoded, int len) {
         uint8_t c;
         int i = 0, j = 0;
 
-        for (; count > 0; count -= 3) {
+        for (; len > 0; len -= 3) {
                 /* extract first 6 bits */
                 c = ((buf_raw[i] & 0xfc) >> 2); 
                 buf_encoded[j++] = map[c];
@@ -119,22 +120,23 @@ int encode(uint8_t *buf_raw, uint8_t *buf_encoded, int count) {
                 buf_encoded[j++] = map[c];
 
                 /* extract third set */
-                if (count > 1) {
+                if (len > 1) {
                         c = ((buf_raw[i+1] & 0xf) << 2) | ((buf_raw[i+2] & 0xc0) >> 6); 
                         buf_encoded[j++] = map[c];
                 }
 
                 /* extract fourth set */
-                if (count > 2) {
+                if (len > 2) {
                         c = (buf_raw[i+2] & 0x3f);
                         buf_encoded[j++] = map[c];
                 }
+                /* we read 3 bytes at a time */
                 i += 3;
         }
         /* add padding */
-        if (count < 0) 
+        if (len < 0) 
                 buf_encoded[j++] = '=';
-        if (count < -1) 
+        if (len < -1) 
                 buf_encoded[j++] = '=';
 
         return j;
