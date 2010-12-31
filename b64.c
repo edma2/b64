@@ -4,7 +4,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
-#include <stdlib.h>
 
 #define BUFSIZE_RAW            48
 #define BUFSIZE_ENCODED        64
@@ -37,9 +36,6 @@ int main(int argc, char *argv[]) {
 		fprintf(stderr, "usage: b64 <mode> <input file>\n");
 		return -1;
 	}
-
-        memset(buf_raw, 0, BUFSIZE_RAW);
-        memset(buf_encoded, 0, BUFSIZE_ENCODED);
 
         /* open source file */
         f = fopen(argv[2], "r");
