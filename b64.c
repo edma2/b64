@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
+#include <stdlib.h>
 
 #define BUFSIZE_RAW            48
 #define BUFSIZE_ENCODED        64
@@ -29,6 +30,8 @@ const uint8_t unmap[256] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
 int main(int argc, char *argv[]) {
         FILE *f;
 	int len;
+        int raw_total = 0;
+        int encoded_total = 0;
 	uint8_t buf_raw[BUFSIZE_RAW];
         uint8_t buf_encoded[BUFSIZE_ENCODED];
 
@@ -47,13 +50,17 @@ int main(int argc, char *argv[]) {
         if (strcmp(argv[1], "-e") == 0) {
                 /* read up to BUFSIZE_RAW bytes */
                 while ((len = fread(buf_raw, sizeof(uint8_t), BUFSIZE_RAW, f)) > 0) {
+                        raw_total += len;
                         /* return number of bytes encoded */
                         len = encode(buf_raw, buf_encoded, len);
+                        encoded_total += len;
                         if (fwrite(buf_encoded, sizeof(uint8_t), len, stdout) != len) {
                                 fprintf(stderr, "b64: write error\n");
                                 break;
                         }
                 }
+                fprintf(stderr, "%d raw bytes\n", raw_total);
+                fprintf(stderr, "%d encoded bytes\n", encoded_total);
                 if (len < 0)
                         fprintf(stderr, "b64: read error\n");
         /* decode */
@@ -93,6 +100,13 @@ int decode(uint8_t *buf_encoded, uint8_t *buf_raw, int len) {
                 c = (((unmap[buf_encoded[i+2]] & 0x3) << 6) | unmap[buf_encoded[i+3]]);
                 buf_raw[j++] = c;
         }
+        /* check if we've reached the end of the file */
+        i -= 4;
+        /* write one less byte for each padding */
+        if (buf_encoded[i+2] == '=')
+                j--;
+        if (buf_encoded[i+3] == '=')
+                j--;
 
         return j;
 }
