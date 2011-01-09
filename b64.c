@@ -4,7 +4,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
-#include <stdlib.h>
 
 #define BUFSIZE_RAW            48
 #define BUFSIZE_ENCODED        64
@@ -35,19 +34,22 @@ int main(int argc, char *argv[]) {
 	uint8_t buf_raw[BUFSIZE_RAW];
         uint8_t buf_encoded[BUFSIZE_ENCODED];
 
-	if (argc != 3) {
-		fprintf(stderr, "usage: b64 <mode> <input file>\n");
+        /* Take care of the arguments */
+	if (argc == 2) {
+                f = fopen(argv[1], "r");
+        } else if (argc == 3) {
+                f = fopen(argv[2], "r");
+        } else {
+		fprintf(stderr, "usage: b64 [mode] <file>\n");
 		return -1;
-	}
+        }
 
-        /* open source file */
-        f = fopen(argv[2], "r");
         if (f == NULL) {
                 fprintf(stderr, "b64: cannot open file\n");
                 return -1;
         }
         /* encode */
-        if (strcmp(argv[1], "-e") == 0) {
+        if (argc == 2 || strcmp(argv[1], "-e") == 0) {
                 /* read up to BUFSIZE_RAW bytes */
                 while ((len = fread(buf_raw, sizeof(uint8_t), BUFSIZE_RAW, f)) > 0) {
                         raw_total += len;
@@ -77,7 +79,7 @@ int main(int argc, char *argv[]) {
                 if (len < 0)
                         fprintf(stderr, "b64: read error\n");
         } else {
-                fprintf(stderr, "b64: missing flag (-e for encode, -d for decode)\n");
+		fprintf(stderr, "usage: b64 [mode] <file>\n");
         }
         fclose(f);
 
@@ -100,9 +102,8 @@ int decode(uint8_t *buf_encoded, uint8_t *buf_raw, int len) {
                 c = (((unmap[buf_encoded[i+2]] & 0x3) << 6) | unmap[buf_encoded[i+3]]);
                 buf_raw[j++] = c;
         }
-        /* check if we've reached the end of the file */
+        /* check EOF, write one less byte for each padding */
         i -= 4;
-        /* write one less byte for each padding */
         if (buf_encoded[i+2] == '=')
                 j--;
         if (buf_encoded[i+3] == '=')
